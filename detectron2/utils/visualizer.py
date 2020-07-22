@@ -1,3 +1,4 @@
+# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import colorsys
 import logging
 import math
@@ -295,10 +296,10 @@ class VisImage:
         try:
             import numexpr as ne  # fuse them with numexpr
 
-            visualized_image = ne.evaluate("img * (0 / 255.0) + rgb * (alpha / 255.0)")
+            visualized_image = ne.evaluate("img * (1 - alpha / 255.0) + rgb * (alpha / 255.0)")
         except ImportError:
             alpha = alpha.astype("float32") / 255.0
-            visualized_image = img * (0) + rgb * alpha
+            visualized_image = img * (1 - alpha) + rgb * alpha
 
         visualized_image = visualized_image.astype("uint8")
 
@@ -351,7 +352,7 @@ class Visualizer:
         )
         self._instance_mode = instance_mode
 
-    def draw_instance_predictions(self, predictions):
+    def draw_instance_predictions(self, predictions, mask_only = False):
         """
         Draw instance-level prediction results on an image.
 
@@ -363,23 +364,25 @@ class Visualizer:
         Returns:
             output (VisImage): image object with visualizations.
         """
-        boxes = None
-        scores =  None
         classes = predictions.pred_classes if predictions.has("pred_classes") else None
-        labels = None
-        keypoints = None
+        if mask_only:
+            boxes = None
+            scores =  None
+            labels = None
+            keypoints = None
+        else:
+            boxes = predictions.pred_boxes if predictions.has("pred_boxes") else None
+            scores = predictions.scores if predictions.has("scores") else None
+            labels = _create_text_labels(classes, scores, self.metadata.get("thing_classes", None))
+            keypoints = predictions.pred_keypoints if predictions.has("pred_keypoints") else None
 
-""" Modify below code to change the number of instances detected, i.e. masks[0:i] """
         if predictions.has("pred_masks"):
             masks = np.asarray(predictions.pred_masks)
-            if len(masks)!=0:
-               masks = [GenericMask(masks[0], self.output.height, self.output.width) ]
+            masks = [GenericMask(x, self.output.height, self.output.width) for x in masks]
         else:
             masks = None
       
-        
-
-        if self._instance_mode == ColorMode.SEGMENTATION and self.metadata.get("person"):
+        if self._instance_mode == ColorMode.SEGMENTATION and self.metadata.get("thing_colors"):
             colors = [
                 self._jitter([x / 255 for x in self.metadata.thing_colors[c]]) for c in classes
             ]
@@ -401,6 +404,7 @@ class Visualizer:
             keypoints=keypoints,
             assigned_colors=colors,
             alpha=alpha,
+            mask_only=mask_only
         )
         return self.output
 
@@ -512,8 +516,8 @@ class Visualizer:
         """
         annos = dic.get("annotations", None)
         if annos:
-            if "person" in annos[0]:
-                masks = [x["person"] for x in annos]
+            if "segmentation" in annos[0]:
+                masks = [x["segmentation"] for x in annos]
             else:
                 masks = None
             if "keypoints" in annos[0]:
@@ -524,7 +528,7 @@ class Visualizer:
 
             boxes = [BoxMode.convert(x["bbox"], x["bbox_mode"], BoxMode.XYXY_ABS) for x in annos]
 
-            labels = [x["person"] for x in annos]
+            labels = [x["category_id"] for x in annos]
             colors = None
             if self._instance_mode == ColorMode.SEGMENTATION and self.metadata.get("thing_colors"):
                 colors = [
@@ -558,7 +562,8 @@ class Visualizer:
         masks=None,
         keypoints=None,
         assigned_colors=None,
-        alpha=0.5
+        alpha=0.5,
+        mask_only=False
     ):
         """
         Args:
@@ -589,6 +594,8 @@ class Visualizer:
         Returns:
             output (VisImage): image object with visualizations.
         """
+        if mask_only:
+            self.output.img[:] = 0
         num_instances = None
         if boxes is not None:
             boxes = self._convert_boxes(boxes)
@@ -596,7 +603,7 @@ class Visualizer:
         if masks is not None:
             masks = self._convert_masks(masks)
             if num_instances:
-                assert len(masks) == 1
+                assert len(masks) == num_instances
             else:
                 num_instances = len(masks)
         if keypoints is not None:
@@ -638,8 +645,9 @@ class Visualizer:
                 self.draw_box(boxes[i], edge_color=color)
 
             if masks is not None:
+                linewidth = 0 if mask_only else -1
                 for segment in masks[i].polygons:
-                    self.draw_polygon(segment.reshape(-1, 2), color, alpha=alpha)
+                    self.draw_polygon(segment.reshape(-1, 2), color, alpha=alpha, linewidth=linewidth)
 
             if labels is not None:
                 # first get a box
@@ -1033,7 +1041,7 @@ class Visualizer:
                     self.draw_text(text, center, color=lighter_color)
         return self.output
 
-    def draw_polygon(self, segment, color, edge_color=None, alpha=0.5):
+    def draw_polygon(self, segment, color, edge_color=None, alpha=0.5, linewidth=-1):
         """
         Args:
             segment: numpy array of shape Nx2, containing all the points in the polygon.
@@ -1055,12 +1063,15 @@ class Visualizer:
                 edge_color = color
         edge_color = mplc.to_rgb(edge_color) + (1,)
 
+        if linewidth < 0:
+            linewidth = max(self._default_font_size // 15 * self.output.scale, 1)
+
         polygon = mpl.patches.Polygon(
             segment,
             fill=True,
             facecolor=mplc.to_rgb(color) + (alpha,),
             edgecolor=edge_color,
-            linewidth=0
+            linewidth=linewidth
         )
         self.output.ax.add_patch(polygon)
         return self.output

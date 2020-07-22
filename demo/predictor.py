@@ -34,7 +34,7 @@ class VisualizationDemo(object):
         else:
             self.predictor = DefaultPredictor(cfg)
 
-    def run_on_image(self, image):
+    def run_on_image(self, image, mask_only = False):
         """
         Args:
             image (np.ndarray): an image of shape (H, W, C) (in BGR order).
@@ -61,7 +61,7 @@ class VisualizationDemo(object):
                 )
             if "instances" in predictions:
                 instances = predictions["instances"].to(self.cpu_device)
-                vis_output = visualizer.draw_instance_predictions(predictions=instances)
+                vis_output = visualizer.draw_instance_predictions(predictions=instances, mask_only=mask_only)
 
         return predictions, vis_output
 
@@ -80,6 +80,8 @@ class VisualizationDemo(object):
         Args:
             video (cv2.VideoCapture): a :class:`VideoCapture` object, whose source can be
                 either a webcam or a video file.
+
+            alpha = 255: segmentation mask only 
 
         Yields:
             ndarray: BGR visualizations of each video frame.

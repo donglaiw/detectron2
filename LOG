@@ -1,1 +1,2 @@
-module load gcc/9.3.0-fasrc01
+module load gcc/7.1.0-fasrc01 cuda/10.2.89-fasrc01 cudnn/7.6.5.32_cuda10.2-fasrc01
+pip install --editable .
