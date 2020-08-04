@@ -15,6 +15,7 @@ from predictor import VisualizationDemo
 # constants
 WINDOW_NAME = "COCO detections"
 
+# python demo/demo_dw.py --config-file configs/COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml --input-template frame/image_%05d.png --input-index 1,25 --output seg/_s%05d.png --opts MODEL.WEIGHTS detectron2://COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x/137849600/model_final_f10217.pkl
 
 def setup_cfg(args):
     # load config from file and command-line arguments
@@ -46,7 +47,7 @@ def get_parser():
         help="A list of comma separated input image index; ",
     )
     parser.add_argument(
-        "--output",
+        "--output-template",
         help="A file or directory to save output visualizations. "
         "If not given, will show output in an OpenCV window.",
     )
@@ -77,10 +78,11 @@ if __name__ == "__main__":
 
     demo = VisualizationDemo(cfg)
 
-    input_files = [args.input_template % int(x) for x in args.input_index.split(',')]
+    input_indices = [int(x) for x in args.input_index.split(',')]
 
-    for path in tqdm.tqdm(input_files, disable=not args.output):
+    for index in tqdm.tqdm(input_indices):
         # use PIL, to be consistent with evaluation
+        path = args.input_template % index
         img = read_image(path, format="BGR")
         start_time = time.time()
         predictions, visualized_output = demo.run_on_image(img, mask_only=True)
@@ -94,10 +96,4 @@ if __name__ == "__main__":
             )
         )
 
-        if os.path.isdir(args.output):
-            assert os.path.isdir(args.output), args.output
-            out_filename = os.path.join(args.output, os.path.basename(path))
-        else:
-            assert len(args.input_index) == 1, "Please specify a directory with args.output"
-            out_filename = args.output
-        visualized_output.save(out_filename)
+        visualized_output.save(args.output_template % index)
