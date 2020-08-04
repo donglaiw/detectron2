@@ -11,4 +11,4 @@ and it originates from [maskrcnn-benchmark](https://github.com/facebookresearch/
 </div>
 
 ### What's New in This Fork
-* Customized demo_dw.py
+* Customized demo_dw.py: instance mask only, customized args
