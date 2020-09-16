@@ -10,6 +10,7 @@ from detectron2.config import get_cfg
 from detectron2.data.detection_utils import read_image
 from detectron2.utils.logger import setup_logger
 
+
 from predictor import VisualizationDemo
 
 # constants
@@ -20,6 +21,10 @@ WINDOW_NAME = "COCO detections"
 def setup_cfg(args):
     # load config from file and command-line arguments
     cfg = get_cfg()
+    if 'pointrend' in args.config_file:
+        import sys; sys.path.insert(1, "/n/pfister_lab2/Lab/donglai/lib/pipeline/detectron2/projects/PointRend")
+        import point_rend
+        point_rend.add_pointrend_config(cfg)
     cfg.merge_from_file(args.config_file)
     cfg.merge_from_list(args.opts)
     # Set score_threshold for builtin models
@@ -82,18 +87,20 @@ if __name__ == "__main__":
 
     for index in tqdm.tqdm(input_indices):
         # use PIL, to be consistent with evaluation
-        path = args.input_template % index
-        img = read_image(path, format="BGR")
-        start_time = time.time()
-        predictions, visualized_output = demo.run_on_image(img, mask_only=True)
-        logger.info(
-            "{}: {} in {:.2f}s".format(
-                path,
-                "detected {} instances".format(len(predictions["instances"]))
-                if "instances" in predictions
-                else "finished",
-                time.time() - start_time,
+        output_name = args.output_template % index
+        if not os.path.exists(output_name):
+            path = args.input_template % index
+            img = read_image(path, format="BGR")
+            start_time = time.time()
+            predictions, visualized_output = demo.run_on_image(img, mask_only=True)
+            logger.info(
+                "{}: {} in {:.2f}s".format(
+                    path,
+                    "detected {} instances".format(len(predictions["instances"]))
+                    if "instances" in predictions
+                    else "finished",
+                    time.time() - start_time,
+                )
             )
-        )
 
-        visualized_output.save(args.output_template % index)
+            visualized_output.save(output_name)
