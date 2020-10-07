@@ -85,6 +85,9 @@ if __name__ == "__main__":
 
     input_indices = [int(x) for x in args.input_index.split(',')]
 
+    output_folder = os.path.dirname(args.output_template)
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
     for index in tqdm.tqdm(input_indices):
         # use PIL, to be consistent with evaluation
         output_name = args.output_template % index
